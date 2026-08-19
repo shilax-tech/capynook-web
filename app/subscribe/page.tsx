@@ -4,13 +4,24 @@ import Link from 'next/link'
 
 export default function SubscribePage() {
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   async function handleSubscribe() {
     setLoading(true)
-    const res = await fetch('/api/stripe/checkout', { method: 'POST' })
-    const data = await res.json()
-    if (data.url) window.location.href = data.url
-    else setLoading(false)
+    setError(null)
+    try {
+      const res = await fetch('/api/stripe/checkout', { method: 'POST' })
+      const data = await res.json()
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        setError(data.error || 'Something went wrong. Please try again.')
+        setLoading(false)
+      }
+    } catch {
+      setError('Something went wrong. Please try again.')
+      setLoading(false)
+    }
   }
 
   return (
@@ -35,6 +46,9 @@ export default function SubscribePage() {
           </ul>
         </div>
 
+        {error && (
+          <p className="mb-3 text-sm text-red-600">{error}</p>
+        )}
         <button
           onClick={handleSubscribe}
           disabled={loading}
