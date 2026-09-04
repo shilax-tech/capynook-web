@@ -24,14 +24,21 @@ export default async function LibraryPage({
   // Get all series
   const { data: allSeries } = await supabase
     .from('series')
-    .select('id, name')
+    .select('id, name, is_free')
     .eq('platform', 'secular')
     .order('name')
+
+  // Free series lead the library. They are the only books a visitor without a subscription
+  // can actually open, so burying them behind 2,500 locked ones wastes the shop window.
+  // is_free lives on series, and PostgREST cannot order parent rows by a joined column, so
+  // the browse view is assembled as "free books, then the rest" across two queries.
+  const freeIds = (allSeries ?? []).filter(s => s.is_free).map(s => s.id)
+  const leadWithFree = !search && !seriesFilter && freeIds.length > 0
 
   // Get books with optional filters.
   // Ordering by series_id first keeps each series' books together. Ordering by book_number
   // alone interleaved the whole library: every series' Book 1, then every series' Book 2.
-  const booksQuery = (mode: 'fts' | 'like') => {
+  const booksQuery = (mode: 'fts' | 'like', only?: 'free' | 'rest') => {
     let q = supabase
       .from('books')
       .select('id, title, cover_url, book_number, series_id, series(name)', { count: 'exact' })
@@ -39,6 +46,8 @@ export default async function LibraryPage({
       .order('series_id')
       .order('book_number')
 
+    if (only === 'free') q = q.in('series_id', freeIds)
+    if (only === 'rest') q = q.not('series_id', 'in', `(${freeIds.join(',')})`)
     if (seriesFilter) q = q.eq('series_id', seriesFilter)
 
     if (search) {
@@ -55,15 +64,53 @@ export default async function LibraryPage({
         q = q.or(`title.ilike.%${esc}%,content.ilike.%${esc}%`)
       }
     }
-    return q.range(from, to)
+    return q
   }
 
-  let { data: books, count, error } = await booksQuery(search ? 'fts' : 'like')
+  type Row = { id: string; title: string; cover_url: string | null
+               book_number: number | null; series_id: string | null; series: unknown }
+  let books: Row[] | null = null
+  let count: number | null = null
 
-  // If search_vector is not there yet, PostgREST returns an error rather than throwing.
-  // Fall back rather than showing the reader an empty library.
-  if (error && search) {
-    ({ data: books, count } = await booksQuery('like'))
+  if (leadWithFree) {
+    // Browse view: free books first, then everything else, paged as one continuous list.
+    // The free count has to be known before choosing ranges. Asking for rows 60-119 of a
+    // 50-row set is a 416 from PostgREST, which would have emptied page 2 entirely.
+    const { count: freeTotal } = await booksQuery('like', 'free').range(0, 0)
+    const freeCount = freeTotal ?? 0
+
+    let freeRows: Row[] = []
+    if (from < freeCount) {
+      const r = await booksQuery('like', 'free').range(from, Math.min(to, freeCount - 1))
+      freeRows = (r.data ?? []) as Row[]
+    }
+
+    let restRows: Row[] = []
+    const restNeeded = PER_PAGE - freeRows.length
+    let restTotal = 0
+    if (restNeeded > 0) {
+      const restFrom = Math.max(0, from - freeCount)
+      const r = await booksQuery('like', 'rest').range(restFrom, restFrom + restNeeded - 1)
+      restRows = (r.data ?? []) as Row[]
+      restTotal = r.count ?? 0
+    } else {
+      const { count: c } = await booksQuery('like', 'rest').range(0, 0)
+      restTotal = c ?? 0
+    }
+
+    books = [...freeRows, ...restRows]
+    count = freeCount + restTotal
+  } else {
+    const res = await booksQuery(search ? 'fts' : 'like').range(from, to)
+    books = (res.data ?? []) as Row[]
+    count = res.count
+    // If search_vector is not there yet, PostgREST returns an error rather than throwing.
+    // Fall back rather than showing the reader an empty library.
+    if (res.error && search) {
+      const fb = await booksQuery('like').range(from, to)
+      books = (fb.data ?? []) as Row[]
+      count = fb.count
+    }
   }
 
   const total = count ?? 0
