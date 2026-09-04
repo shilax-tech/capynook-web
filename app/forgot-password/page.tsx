@@ -1,24 +1,49 @@
 'use client'
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { createBrowserClient } from '@supabase/ssr'
 import Link from 'next/link'
+
+/**
+ * Password recovery uses the IMPLICIT flow on purpose.
+ *
+ * The default PKCE flow stores a code verifier in the browser that asked for the reset, so
+ * the link is only redeemable in that same browser. People request a reset on a laptop and
+ * open the email on their phone, which fails with "PKCE code verifier not found in storage"
+ * and strands them with no way through. Ryan hit exactly that.
+ *
+ * Implicit links carry the tokens in the URL fragment and work from any device, which is the
+ * whole point of a recovery link. /auth/reset-password consumes them and immediately strips
+ * them out of the address bar.
+ */
+function recoveryClient() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { flowType: 'implicit' } }
+  )
+}
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const supabase = createClient()
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
+    // Read the field, not React state - password managers can fill without firing the event
+    // React listens for. Same trap as the login form.
+    const form = new FormData(e.currentTarget)
+    const address = String(form.get('email') ?? '').trim() || email
+    if (!address) { setError('Enter your email address.'); return }
+
     setLoading(true)
     setError('')
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const { error } = await recoveryClient().auth.resetPasswordForEmail(address, {
       redirectTo: `${window.location.origin}/auth/reset-password`,
     })
     if (error) { setError(error.message); setLoading(false) }
-    else { setSent(true); setLoading(false) }
+    else { setEmail(address); setSent(true); setLoading(false) }
   }
 
   return (
@@ -42,6 +67,8 @@ export default function ForgotPasswordPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <input
                 type="email"
+                name="email"
+                autoComplete="email"
                 placeholder="Email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}

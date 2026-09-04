@@ -21,11 +21,31 @@ function LoginForm() {
   // Someone sent here mid-redemption goes back to their code, not to the library.
   const next = safeNext(params.get('next'))
 
-  async function handleLogin(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
+
+    // Read the FIELDS, not React state.
+    //
+    // Password managers write straight into the DOM node. Bitwarden in particular can fill
+    // without firing the event React listens for, so a controlled input's state stays empty
+    // and the form posts blanks - which the server answers with "Invalid login credentials".
+    // The password is correct, the request never carried it. Ryan lost an afternoon to this
+    // with a password that had never changed.
+    const form = new FormData(e.currentTarget)
+    const emailValue = String(form.get('email') ?? '').trim() || email
+    const passwordValue = String(form.get('password') ?? '') || password
+
+    if (!emailValue || !passwordValue) {
+      setError('Enter your email and password.')
+      return
+    }
+
     setLoading(true)
     setError('')
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { error } = await supabase.auth.signInWithPassword({
+      email: emailValue,
+      password: passwordValue,
+    })
     if (error) { setError(error.message); setLoading(false); return }
 
     // HARD navigation, not router.push. A soft navigation can be served from an RSC payload
@@ -42,12 +62,12 @@ function LoginForm() {
         <p className="text-amber-600 mb-8">Log in to access your library</p>
         <form onSubmit={handleLogin} className="space-y-4">
           <input
-            type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)}
+            type="email" name="email" autoComplete="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)}
             className="w-full border border-amber-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-400"
             required
           />
           <input
-            type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)}
+            type="password" name="password" autoComplete="current-password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)}
             className="w-full border border-amber-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-400"
             required
           />

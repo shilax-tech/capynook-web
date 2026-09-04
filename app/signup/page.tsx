@@ -73,12 +73,12 @@ function SignupForm() {
         </p>
         <form onSubmit={handleSignup} className="space-y-4">
           <input
-            type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)}
+            type="email" name="email" autoComplete="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)}
             className="w-full border border-amber-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-400"
             required
           />
           <input
-            type="password" placeholder="Password (min 8 chars)" value={password} onChange={e => setPassword(e.target.value)}
+            type="password" name="password" autoComplete="new-password" placeholder="Password (min 8 chars)" value={password} onChange={e => setPassword(e.target.value)}
             className="w-full border border-amber-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-400"
             minLength={8} required
           />
