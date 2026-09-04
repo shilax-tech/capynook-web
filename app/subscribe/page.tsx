@@ -1,18 +1,20 @@
 'use client'
-import { Suspense, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 
+const clean = (s: string) => s.toUpperCase().replace(/[\s-]+/g, '')
+
 function SubscribeInner() {
-  const router = useRouter()
   const params = useSearchParams()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Arriving from the landing page or straight back from signup, the code is already in the
-  // URL. Prefilling means it is never typed twice and never mistyped the second time.
-  const [code, setCode] = useState(params.get('code') ?? '')
+  // Arriving from the landing page or straight back from logging in, the code is already in
+  // the URL. Prefilling means it is never typed twice and never mistyped the second time.
+  const urlCode = params.get('code') ?? ''
+  const [code, setCode] = useState(urlCode)
   const [redeeming, setRedeeming] = useState(false)
   const [codeError, setCodeError] = useState<string | null>(null)
   const [needsAccount, setNeedsAccount] = useState(false)
@@ -36,28 +38,28 @@ function SubscribeInner() {
     }
   }
 
-  async function handleRedeem(e: React.FormEvent) {
-    e.preventDefault()
-    if (!code.trim()) return
+  const redeem = useCallback(async (raw: string) => {
+    const value = raw.trim()
+    if (!value) return
     setRedeeming(true)
     setCodeError(null)
     try {
       const res = await fetch('/api/redeem', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ code: value }),
       })
       const data = await res.json()
       if (data.ok) {
         setRedeemed(true)
-        // The paywall reads the subscriptions row on the server, so the library has to be
-        // re-fetched rather than client-navigated to.
-        router.refresh()
-        setTimeout(() => { window.location.href = '/library' }, 1200)
+        // Hard navigation: the paywall reads the subscriptions row on the server, so the
+        // library must be re-fetched rather than client-navigated to.
+        setTimeout(() => { window.location.assign('/library') }, 1200)
       } else if (res.status === 401) {
-        // Someone handed a code has no account yet. Send them to sign up and bring them
-        // straight back with the code still in the URL, rather than making them find
-        // this page again on their own.
+        // Not signed in. This used to offer only "create an account", which is the wrong
+        // instruction for anyone who already has one, and its fallback linked to a bare
+        // /login that threw the code away. Both routes now carry the code back here, and
+        // the return trip redeems it automatically.
         setNeedsAccount(true)
         setRedeeming(false)
       } else {
@@ -68,6 +70,22 @@ function SubscribeInner() {
       setCodeError('Something went wrong. Try again.')
       setRedeeming(false)
     }
+  }, [])
+
+  // Coming back from logging in, the code is in the URL and the session now exists. Redeem it
+  // without making them press the button a second time - that second press is where people
+  // give up. Guarded so it fires once, never on a re-render.
+  const autoTried = useRef(false)
+  useEffect(() => {
+    if (urlCode && !autoTried.current) {
+      autoTried.current = true
+      redeem(urlCode)
+    }
+  }, [urlCode, redeem])
+
+  function handleRedeem(e: React.FormEvent) {
+    e.preventDefault()
+    redeem(code)
   }
 
   return (
@@ -134,18 +152,30 @@ function SubscribeInner() {
               </form>
               {codeError && <p className="mt-2 text-sm text-red-600">{codeError}</p>}
               {needsAccount && (
-                <div className="mt-3 text-sm text-amber-700">
-                  <p className="mb-2">You&apos;ll need an account first — it&apos;s free.</p>
-                  <Link
-                    href={`/signup?next=${encodeURIComponent(
-                      `/subscribe?code=${code.toUpperCase().replace(/[\s-]+/g, '')}`
-                    )}`}
-                    className="inline-block px-5 py-2 rounded-xl font-semibold bg-amber-500 text-white hover:bg-amber-600 transition-colors"
-                  >
-                    Create a free account
-                  </Link>
+                <div className="mt-4 text-sm text-amber-700">
+                  <p className="mb-3">
+                    Your code is good — you just need to be signed in to use it.
+                  </p>
+                  <div className="flex gap-2">
+                    {/* BOTH paths carry the code back. Offering only "create an account" is
+                        wrong for anyone who already has one, and the fallback used to link to
+                        a bare /login, which dropped the code and dead-ended them in the
+                        library with nothing unlocked. */}
+                    <Link
+                      href={`/signup?next=${encodeURIComponent(`/subscribe?code=${clean(code)}`)}`}
+                      className="flex-1 px-4 py-2.5 rounded-xl font-semibold bg-amber-500 text-white hover:bg-amber-600 transition-colors"
+                    >
+                      Create account
+                    </Link>
+                    <Link
+                      href={`/login?next=${encodeURIComponent(`/subscribe?code=${clean(code)}`)}`}
+                      className="flex-1 px-4 py-2.5 rounded-xl font-semibold bg-white border-2 border-amber-400 text-amber-700 hover:bg-amber-50 transition-colors"
+                    >
+                      Log in
+                    </Link>
+                  </div>
                   <p className="mt-2 text-xs text-amber-500">
-                    We&apos;ll bring you back here and your code will be waiting.
+                    Either way we bring you straight back and apply the code for you.
                   </p>
                 </div>
               )}
@@ -161,10 +191,20 @@ function SubscribeInner() {
   )
 }
 
+function Loading() {
+  return (
+    <main className="min-h-screen flex items-center justify-center px-6">
+      <div className="w-full max-w-md bg-white rounded-3xl shadow-md p-8 text-center">
+        <p className="text-amber-600">Loading&hellip;</p>
+      </div>
+    </main>
+  )
+}
+
 // useSearchParams needs a Suspense boundary or the route opts out of prerendering.
 export default function SubscribePage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<Loading />}>
       <SubscribeInner />
     </Suspense>
   )

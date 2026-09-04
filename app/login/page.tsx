@@ -92,10 +92,20 @@ function LoginForm() {
   )
 }
 
+function Loading() {
+  return (
+    <main className="min-h-screen flex items-center justify-center px-6">
+      <div className="w-full max-w-md bg-white rounded-3xl shadow-md p-8 text-center">
+        <p className="text-amber-600">Loading&hellip;</p>
+      </div>
+    </main>
+  )
+}
+
 // useSearchParams needs a Suspense boundary or the route opts out of prerendering.
 export default function LoginPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<Loading />}>
       <LoginForm />
     </Suspense>
   )

@@ -49,8 +49,9 @@ function SignupForm() {
       return
     }
 
-    // Confirmation is on, so a genuine new signup comes back with a user and no session.
-    // Telling them to go and click the email beats dropping them at a login they cannot pass.
+    // With email confirmation ON a genuine new signup returns a user and no session; with it
+    // OFF a session comes back and we go straight through. Handling both means the page does
+    // not silently break the next time that setting is toggled.
     if (!data.session) {
       setNotice('confirm')
       setLoading(false)
@@ -119,10 +120,20 @@ function SignupForm() {
   )
 }
 
+function Loading() {
+  return (
+    <main className="min-h-screen flex items-center justify-center px-6">
+      <div className="w-full max-w-md bg-white rounded-3xl shadow-md p-8 text-center">
+        <p className="text-amber-600">Loading&hellip;</p>
+      </div>
+    </main>
+  )
+}
+
 // useSearchParams needs a Suspense boundary or the whole route opts out of prerendering.
 export default function SignupPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<Loading />}>
       <SignupForm />
     </Suspense>
   )
