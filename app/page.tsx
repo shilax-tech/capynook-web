@@ -93,8 +93,11 @@ export default async function Home() {
       {/* The shelf. Real covers from the free series, fanned like books on a table.
           Hidden entirely rather than rendering an empty row if the query comes back short. */}
       {covers.length > 0 && (
-        <section className="w-full max-w-5xl mt-16" aria-label="Books from the free collection">
-          <div className="flex justify-center items-end gap-3 sm:gap-5 overflow-x-auto pb-4 px-2">
+        <section className="w-full max-w-4xl mt-16" aria-label="Books from the free collection">
+          {/* Sized to FIT rather than to scroll. Fixed-width cards plus gaps plus the rotation
+              bleed overflowed at 800px and clipped the outer two, which is worse than smaller
+              covers. Five at 112px clears it with room to spare. */}
+          <div className="flex justify-center items-end gap-2 sm:gap-4 pb-4 px-2">
             {covers.map((b, i) => {
               const mid = (covers.length - 1) / 2
               const off = i - mid
@@ -105,16 +108,17 @@ export default async function Home() {
                   title={b.title}
                   className="group shrink-0 transition-transform duration-200 hover:-translate-y-2 hover:rotate-0"
                   style={{
-                    transform: `rotate(${off * 2.4}deg) translateY(${Math.abs(off) * 7}px)`,
+                    transform: `rotate(${off * 2}deg) translateY(${Math.abs(off) * 6}px)`,
                     zIndex: 10 - Math.abs(Math.round(off)),
                   }}
                 >
-                  <div className="relative w-24 sm:w-32 md:w-36 aspect-[2/3] rounded-lg overflow-hidden shadow-md ring-1 ring-amber-900/10 group-hover:shadow-xl transition-shadow">
+                  <div className="relative w-16 sm:w-24 md:w-28 aspect-[2/3] rounded-lg overflow-hidden shadow-md ring-1 ring-amber-900/10 group-hover:shadow-xl transition-shadow">
                     <Image
                       src={b.cover_url}
                       alt={b.title}
                       fill
-                      sizes="(max-width: 640px) 96px, (max-width: 768px) 128px, 144px"
+                      priority={i < 3}
+                      sizes="(max-width: 640px) 64px, (max-width: 768px) 96px, 112px"
                       className="object-cover"
                     />
                   </div>
