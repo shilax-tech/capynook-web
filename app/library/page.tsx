@@ -94,41 +94,47 @@ export default async function LibraryPage({
   return (
     <main className="min-h-screen px-4 py-8 max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold text-amber-900">🦫 Library</h1>
+        <h1 className="text-3xl font-bold text-amber-900">Library</h1>
         <form action="/api/auth/signout" method="post">
           <button className="text-amber-600 hover:text-amber-800 text-sm">Sign out</button>
         </form>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 mb-4">
-        <form className="flex-1 min-w-48">
-          {seriesFilter && <input type="hidden" name="series" value={seriesFilter} />}
-          <input
-            name="search"
-            defaultValue={search}
-            placeholder="Search books..."
-            className="w-full border border-amber-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
-          />
-        </form>
-        <div className="flex flex-wrap gap-2">
+      {/* Filters.
+          There are 64 series. As a row of pills that filled the whole screen before a single
+          book appeared, so the series picker is a select and the two controls submit together. */}
+      <form className="flex flex-col sm:flex-row gap-3 mb-4">
+        <input
+          name="search"
+          defaultValue={search}
+          placeholder="Search titles and stories..."
+          className="flex-1 min-w-0 border border-amber-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+        />
+        <select
+          name="series"
+          defaultValue={seriesFilter ?? ''}
+          className="sm:w-72 border border-amber-200 rounded-xl px-4 py-2 bg-white text-amber-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
+        >
+          <option value="">All series ({allSeries?.length ?? 0})</option>
+          {allSeries?.map(s => (
+            <option key={s.id} value={s.id}>{s.name}</option>
+          ))}
+        </select>
+        <button
+          type="submit"
+          className="px-5 py-2 rounded-xl text-sm font-medium bg-amber-500 text-white hover:bg-amber-600 transition-colors"
+        >
+          Search
+        </button>
+        {(search || seriesFilter) && (
           <Link
             href="/library"
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${!seriesFilter ? 'bg-amber-500 text-white' : 'bg-white border border-amber-200 text-amber-700 hover:bg-amber-50'}`}
+            className="px-5 py-2 rounded-xl text-sm font-medium bg-white border border-amber-200 text-amber-700 hover:bg-amber-50 text-center"
           >
-            All
+            Clear
           </Link>
-          {allSeries?.map(s => (
-            <Link
-              key={s.id}
-              href={`/library?series=${s.id}`}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${seriesFilter === s.id ? 'bg-amber-500 text-white' : 'bg-white border border-amber-200 text-amber-700 hover:bg-amber-50'}`}
-            >
-              {s.name}
-            </Link>
-          ))}
-        </div>
-      </div>
+        )}
+      </form>
 
       {total > 0 && (
         <p className="text-sm text-amber-700 mb-6">
@@ -138,27 +144,48 @@ export default async function LibraryPage({
         </p>
       )}
 
-      {/* Book grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        {books?.map(book => (
-          <Link key={book.id} href={`/book/${book.id}`} className="group">
-            <div className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-              {book.cover_url ? (
-                <div className="relative aspect-[2/3]">
-                  <Image
-                    src={book.cover_url}
-                    alt={book.title}
-                    fill
-                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 16vw"
-                    className="object-cover"
-                  />
-                </div>
-              ) : (
-                <div className="aspect-[2/3] bg-amber-100 flex items-center justify-center text-4xl">📖</div>
-              )}
-            </div>
-          </Link>
-        ))}
+      {/* Book grid.
+          Only 91 of 2,570 books have a cover, and search now matches story text as well as
+          titles, so a grid of unlabelled placeholders gave the reader no way to tell why any
+          result was there. Every card carries its title and series. */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        {books?.map(book => {
+          const seriesName = Array.isArray(book.series)
+            ? book.series[0]?.name
+            : (book.series as { name?: string } | null)?.name
+          return (
+            <Link key={book.id} href={`/book/${book.id}`} className="group flex flex-col">
+              <div className="bg-white rounded-2xl overflow-hidden shadow-sm group-hover:shadow-md transition-shadow">
+                {book.cover_url ? (
+                  <div className="relative aspect-[2/3]">
+                    <Image
+                      src={book.cover_url}
+                      alt={book.title}
+                      fill
+                      sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                      className="object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="aspect-[2/3] bg-gradient-to-br from-amber-100 to-amber-200 flex items-center justify-center p-3">
+                    <span className="text-amber-800 text-sm font-medium text-center line-clamp-5">
+                      {book.title}
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div className="px-1 pt-2">
+                <p className="text-sm font-medium text-amber-900 leading-snug line-clamp-2 group-hover:text-amber-700">
+                  {book.title}
+                </p>
+                <p className="text-xs text-amber-600 mt-0.5 truncate">
+                  {seriesName ? `${seriesName}` : 'Unsorted'}
+                  {book.book_number ? ` · #${book.book_number}` : ''}
+                </p>
+              </div>
+            </Link>
+          )
+        })}
       </div>
 
       {totalPages > 1 && (
@@ -198,7 +225,7 @@ export default async function LibraryPage({
 
       {(!books || books.length === 0) && (
         <div className="text-center py-16 text-amber-600">
-          <div className="text-5xl mb-4">📭</div>
+          
           <p>No books found. Try a different filter.</p>
         </div>
       )}
