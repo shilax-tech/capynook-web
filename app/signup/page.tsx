@@ -17,6 +17,7 @@ function SignupForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState<'already' | 'confirm' | null>(null)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const params = useSearchParams()
@@ -31,12 +32,33 @@ function SignupForm() {
     e.preventDefault()
     setLoading(true)
     setError('')
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email, password,
       options: { emailRedirectTo: `${window.location.origin}${next}` }
     })
-    if (error) { setError(error.message); setLoading(false) }
-    else router.push(next)
+    if (error) { setError(error.message); setLoading(false); return }
+
+    // Supabase returns a deliberate FAKE SUCCESS when the address is already registered -
+    // enumeration protection, so nobody can probe who has an account. No error, and no
+    // session. Redirecting on "no error" therefore sent people to /library having done
+    // nothing, which reads as a successful signup and is not one. An existing user is given
+    // away only by an empty identities array, never by an error.
+    const alreadyRegistered = data.user && (data.user.identities?.length ?? 0) === 0
+    if (alreadyRegistered) {
+      setNotice('already')
+      setLoading(false)
+      return
+    }
+
+    // Confirmation is on, so a genuine new signup comes back with a user and no session.
+    // Telling them to go and click the email beats dropping them at a login they cannot pass.
+    if (!data.session) {
+      setNotice('confirm')
+      setLoading(false)
+      return
+    }
+
+    router.push(next)
   }
 
   return (
@@ -60,6 +82,27 @@ function SignupForm() {
             minLength={8} required
           />
           {error && <p className="text-red-500 text-sm">{error}</p>}
+          {notice === 'already' && (
+            <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800">
+              <p className="font-semibold mb-1">You already have an account</p>
+              <p>
+                Use{' '}
+                <Link href="/login" className="underline font-semibold">log in</Link>
+                {' '}instead, or{' '}
+                <Link href="/forgot-password" className="underline font-semibold">reset your password</Link>
+                {' '}if you have forgotten it.
+              </p>
+            </div>
+          )}
+          {notice === 'confirm' && (
+            <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800">
+              <p className="font-semibold mb-1">Check your email</p>
+              <p>
+                We sent a confirmation link to <span className="font-medium">{email}</span>.
+                Click it and you can log in. Look in your spam folder if it has not arrived.
+              </p>
+            </div>
+          )}
           <button
             type="submit" disabled={loading}
             className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition-colors"
