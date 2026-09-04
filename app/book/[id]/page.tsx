@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { hasActiveSubscription } from '@/lib/subscription'
+import { hasActiveSubscription, isOwner } from '@/lib/subscription'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
@@ -21,8 +21,9 @@ export default async function BookPage({ params }: { params: Promise<{ id: strin
   const series = book.series as any
   const isFree = series?.is_free ?? false
 
-  // Gate: non-free series require active subscription
-  if (!isFree) {
+  // Gate: non-free series require an active subscription. The owner is let through so he can
+  // review his own library, which he otherwise cannot: only one series is marked is_free.
+  if (!isFree && !isOwner(user.email)) {
     const subscribed = await hasActiveSubscription(user.id, supabase)
     if (!subscribed) {
       return (
