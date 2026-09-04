@@ -1,6 +1,23 @@
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/server'
 
-export default function Home() {
+// The shop window said "700+ Stories" while the library held 2,741, which undersells the
+// whole thing by a factor of four. Counted rather than typed, so it cannot drift again.
+async function storyCount(): Promise<string> {
+  try {
+    const supabase = await createClient()
+    const { count } = await supabase
+      .from('books')
+      .select('id', { count: 'exact', head: true })
+    if (!count) return '2,700+'
+    return `${(Math.floor(count / 100) * 100).toLocaleString()}+`
+  } catch {
+    return '2,700+'
+  }
+}
+
+export default async function Home() {
+  const stories = await storyCount()
   return (
     <main className="min-h-screen flex flex-col items-center justify-center px-6 text-center">
       <div className="max-w-2xl">
@@ -25,8 +42,8 @@ export default function Home() {
         <div className="mt-16 grid grid-cols-3 gap-6 text-amber-800">
           <div className="bg-white rounded-2xl p-6 shadow-sm">
             <div className="text-3xl mb-2">📖</div>
-            <div className="font-semibold">700+ Stories</div>
-            <div className="text-sm text-amber-600">New ones added daily</div>
+            <div className="font-semibold">{stories} Stories</div>
+            <div className="text-sm text-amber-600">Across 67 series</div>
           </div>
           <div className="bg-white rounded-2xl p-6 shadow-sm">
             <div className="text-3xl mb-2">⭐</div>

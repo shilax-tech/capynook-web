@@ -5,10 +5,21 @@ import Image from 'next/image'
 
 const PER_PAGE = 60
 
+// The schema allows 'secular' and 'christian'. This page hardcoded 'secular', which left 171
+// live books — Stories of the Bible and Little Wings — unreachable: present in the database,
+// on the site, and in no list anywhere. Secular stays the default so the shop window does not
+// change on its own, but the reader can now get to the rest.
+const PLATFORMS = ['secular', 'christian'] as const
+const PLATFORM_LABEL: Record<string, string> = {
+  secular: 'Story library',
+  christian: 'Bible stories',
+  all: 'Everything',
+}
+
 export default async function LibraryPage({
   searchParams,
 }: {
-  searchParams: Promise<{ series?: string; search?: string; page?: string }>
+  searchParams: Promise<{ series?: string; search?: string; page?: string; platform?: string }>
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -17,16 +28,21 @@ export default async function LibraryPage({
   const params = await searchParams
   const { series: seriesFilter, search } = params
 
+  const platform = params.platform === 'all'
+    || (PLATFORMS as readonly string[]).includes(params.platform ?? '')
+    ? params.platform! : 'secular'
+
   const page = Math.max(1, Number.parseInt(params.page ?? '1', 10) || 1)
   const from = (page - 1) * PER_PAGE
   const to = from + PER_PAGE - 1
 
   // Get all series
-  const { data: allSeries } = await supabase
+  let seriesQuery = supabase
     .from('series')
     .select('id, name, is_free')
-    .eq('platform', 'secular')
     .order('name')
+  if (platform !== 'all') seriesQuery = seriesQuery.eq('platform', platform)
+  const { data: allSeries } = await seriesQuery
 
   // Free series lead the library. They are the only books a visitor without a subscription
   // can actually open, so burying them behind 2,500 locked ones wastes the shop window.
@@ -42,10 +58,10 @@ export default async function LibraryPage({
     let q = supabase
       .from('books')
       .select('id, title, cover_url, book_number, series_id, series(name)', { count: 'exact' })
-      .eq('platform', 'secular')
       .order('series_id')
       .order('book_number')
 
+    if (platform !== 'all') q = q.eq('platform', platform)
     if (only === 'free') q = q.in('series_id', freeIds)
     if (only === 'rest') q = q.not('series_id', 'in', `(${freeIds.join(',')})`)
     if (seriesFilter) q = q.eq('series_id', seriesFilter)
@@ -118,9 +134,11 @@ export default async function LibraryPage({
   const showingFrom = total === 0 ? 0 : from + 1
   const showingTo = Math.min(from + PER_PAGE, total)
 
-  // Page links must carry the current filter and search, or paging silently resets them.
+  // Page links must carry the current filter, search and platform, or paging silently
+  // resets them.
   const hrefFor = (p: number) => {
     const q = new URLSearchParams()
+    if (platform !== 'secular') q.set('platform', platform)
     if (seriesFilter) q.set('series', seriesFilter)
     if (search) q.set('search', search)
     if (p > 1) q.set('page', String(p))
@@ -157,6 +175,18 @@ export default async function LibraryPage({
           placeholder="Search titles and stories..."
           className="flex-1 min-w-0 border border-amber-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
         />
+        {/* Collection picker. Christian-platform books — Stories of the Bible and Little
+            Wings, 171 of them — were live in the database but reachable from nowhere on the
+            site while this page hardcoded 'secular'. */}
+        <select
+          name="platform"
+          defaultValue={platform}
+          className="sm:w-48 border border-amber-200 rounded-xl px-4 py-2 bg-white text-amber-800 focus:outline-none focus:ring-2 focus:ring-amber-400"
+        >
+          {['secular', 'christian', 'all'].map(p => (
+            <option key={p} value={p}>{PLATFORM_LABEL[p]}</option>
+          ))}
+        </select>
         <select
           name="series"
           defaultValue={seriesFilter ?? ''}
@@ -175,7 +205,7 @@ export default async function LibraryPage({
         </button>
         {(search || seriesFilter) && (
           <Link
-            href="/library"
+            href={platform === 'secular' ? '/library' : `/library?platform=${platform}`}
             className="px-5 py-2 rounded-xl text-sm font-medium bg-white border border-amber-200 text-amber-700 hover:bg-amber-50 text-center"
           >
             Clear
