@@ -167,10 +167,14 @@ export default async function LibraryPage({
                     />
                   </div>
                 ) : (
-                  <div className="aspect-[2/3] bg-gradient-to-br from-amber-100 to-amber-200 flex items-center justify-center p-3">
-                    <span className="text-amber-800 text-sm font-medium text-center line-clamp-5">
-                      {book.title}
-                    </span>
+                  // No cover. The title sits under every card already, so repeating it here
+                  // just doubled it up. A quiet placeholder keeps the grid calm instead.
+                  <div className="aspect-[2/3] bg-amber-50 border border-amber-100 flex items-center justify-center">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25"
+                         className="w-8 h-8 text-amber-300" aria-hidden="true">
+                      <path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H18a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H5.5A1.5 1.5 0 0 1 4 18.5v-14Z" />
+                      <path d="M4 17.5A1.5 1.5 0 0 1 5.5 16H19" />
+                    </svg>
                   </div>
                 )}
               </div>
