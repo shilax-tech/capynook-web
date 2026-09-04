@@ -34,7 +34,7 @@ async function stats() {
           .not('cover_url', 'is', null)
           .like('cover_url', 'http%')
           .order('book_number')
-          .limit(7)
+          .limit(5)
       : { data: [] }
 
     const { count: free } = freeIds.length
