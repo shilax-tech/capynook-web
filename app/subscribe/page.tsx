@@ -1,17 +1,21 @@
 'use client'
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 
-export default function SubscribePage() {
+function SubscribeInner() {
   const router = useRouter()
+  const params = useSearchParams()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const [code, setCode] = useState('')
+  // Arriving from the landing page or straight back from signup, the code is already in the
+  // URL. Prefilling means it is never typed twice and never mistyped the second time.
+  const [code, setCode] = useState(params.get('code') ?? '')
   const [redeeming, setRedeeming] = useState(false)
   const [codeError, setCodeError] = useState<string | null>(null)
+  const [needsAccount, setNeedsAccount] = useState(false)
   const [redeemed, setRedeemed] = useState(false)
 
   async function handleSubscribe() {
@@ -50,6 +54,12 @@ export default function SubscribePage() {
         // re-fetched rather than client-navigated to.
         router.refresh()
         setTimeout(() => { window.location.href = '/library' }, 1200)
+      } else if (res.status === 401) {
+        // Someone handed a code has no account yet. Send them to sign up and bring them
+        // straight back with the code still in the URL, rather than making them find
+        // this page again on their own.
+        setNeedsAccount(true)
+        setRedeeming(false)
       } else {
         setCodeError(data.error || 'That code could not be used.')
         setRedeeming(false)
@@ -123,6 +133,22 @@ export default function SubscribePage() {
                 </button>
               </form>
               {codeError && <p className="mt-2 text-sm text-red-600">{codeError}</p>}
+              {needsAccount && (
+                <div className="mt-3 text-sm text-amber-700">
+                  <p className="mb-2">You&apos;ll need an account first — it&apos;s free.</p>
+                  <Link
+                    href={`/signup?next=${encodeURIComponent(
+                      `/subscribe?code=${code.toUpperCase().replace(/[\s-]+/g, '')}`
+                    )}`}
+                    className="inline-block px-5 py-2 rounded-xl font-semibold bg-amber-500 text-white hover:bg-amber-600 transition-colors"
+                  >
+                    Create a free account
+                  </Link>
+                  <p className="mt-2 text-xs text-amber-500">
+                    We&apos;ll bring you back here and your code will be waiting.
+                  </p>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -132,5 +158,14 @@ export default function SubscribePage() {
         </Link>
       </div>
     </main>
+  )
+}
+
+// useSearchParams needs a Suspense boundary or the route opts out of prerendering.
+export default function SubscribePage() {
+  return (
+    <Suspense fallback={null}>
+      <SubscribeInner />
+    </Suspense>
   )
 }

@@ -88,6 +88,17 @@ export default async function Home() {
         <p className="mt-4 text-sm text-amber-600">
           {free.toLocaleString()} books free, no card needed.
         </p>
+
+        {/* Gift codes were only reachable at /subscribe, which nothing on this page linked to,
+            so anyone handed a code had nowhere to put it. */}
+        <p className="mt-2 text-sm">
+          <Link
+            href="/subscribe"
+            className="text-amber-700 underline decoration-amber-300 underline-offset-4 hover:decoration-amber-600"
+          >
+            Have a gift code? Redeem it →
+          </Link>
+        </p>
       </div>
 
       {/* The shelf. Real covers from the free series, fanned like books on a table.

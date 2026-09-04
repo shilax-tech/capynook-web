@@ -1,16 +1,31 @@
 'use client'
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
-export default function SignupPage() {
+/**
+ * Only ever redirect to a path on this site. `?next=https://elsewhere` would otherwise make
+ * the signup form an open redirect, and "//host" is a protocol-relative URL, not a path.
+ */
+function safeNext(raw: string | null): string {
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return '/library'
+  return raw
+}
+
+function SignupForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const params = useSearchParams()
   const supabase = createClient()
+
+  // Someone arriving with a gift code goes back to redeem it with the code still in hand,
+  // so they never retype it or have to find the subscribe page on their own.
+  const next = safeNext(params.get('next'))
+  const gift = next.includes('code=')
 
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault()
@@ -18,17 +33,21 @@ export default function SignupPage() {
     setError('')
     const { error } = await supabase.auth.signUp({
       email, password,
-      options: { emailRedirectTo: `${window.location.origin}/library` }
+      options: { emailRedirectTo: `${window.location.origin}${next}` }
     })
     if (error) { setError(error.message); setLoading(false) }
-    else router.push('/library')
+    else router.push(next)
   }
 
   return (
     <main className="min-h-screen flex items-center justify-center px-6">
       <div className="w-full max-w-md bg-white rounded-3xl shadow-md p-8">
         <h1 className="text-3xl font-bold text-amber-900 mb-2">Start reading</h1>
-        <p className="text-amber-600 mb-8">Create your free account</p>
+        <p className="text-amber-600 mb-8">
+          {gift
+            ? 'Create your account, then your gift code unlocks the library.'
+            : 'Create your free account'}
+        </p>
         <form onSubmit={handleSignup} className="space-y-4">
           <input
             type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)}
@@ -53,5 +72,14 @@ export default function SignupPage() {
         </p>
       </div>
     </main>
+  )
+}
+
+// useSearchParams needs a Suspense boundary or the whole route opts out of prerendering.
+export default function SignupPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignupForm />
+    </Suspense>
   )
 }
