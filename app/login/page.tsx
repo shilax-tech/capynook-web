@@ -1,24 +1,38 @@
 'use client'
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
-export default function LoginPage() {
+/** Only ever redirect to a path on this site — never absolute or protocol-relative. */
+function safeNext(raw: string | null): string {
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return '/library'
+  return raw
+}
+
+function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
+  const params = useSearchParams()
   const supabase = createClient()
+
+  // Someone sent here mid-redemption goes back to their code, not to the library.
+  const next = safeNext(params.get('next'))
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError('')
     const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) { setError(error.message); setLoading(false) }
-    else router.push('/library')
+    if (error) { setError(error.message); setLoading(false); return }
+
+    // HARD navigation, not router.push. A soft navigation can be served from an RSC payload
+    // cached while the visitor was still logged out; middleware then sees no session and
+    // bounces straight back to this page. The sign-in has already succeeded by then, so
+    // nothing shows an error and it reads as the login button doing nothing at all.
+    window.location.assign(next)
   }
 
   return (
@@ -55,5 +69,14 @@ export default function LoginPage() {
         </p>
       </div>
     </main>
+  )
+}
+
+// useSearchParams needs a Suspense boundary or the route opts out of prerendering.
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   )
 }

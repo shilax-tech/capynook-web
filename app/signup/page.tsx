@@ -1,7 +1,7 @@
 'use client'
 import { Suspense, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
 /**
@@ -19,7 +19,6 @@ function SignupForm() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState<'already' | 'confirm' | null>(null)
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
   const params = useSearchParams()
   const supabase = createClient()
 
@@ -58,7 +57,9 @@ function SignupForm() {
       return
     }
 
-    router.push(next)
+    // Hard navigation for the same reason as the login page: a soft push can be served from
+    // an RSC payload cached while logged out, and middleware then bounces straight back.
+    window.location.assign(next)
   }
 
   return (
