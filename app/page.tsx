@@ -53,7 +53,7 @@ async function stats() {
 }
 
 export default async function Home() {
-  const { stories, series, free, covers } = await stats()
+  const { stories, series, covers } = await stats()
 
   return (
     <main className="min-h-screen flex flex-col items-center px-6 py-14 sm:py-20">
@@ -85,19 +85,10 @@ export default async function Home() {
             Log In
           </Link>
         </div>
+        {/* Every book is free now (paywall removed 2026-10-25), so the offer is the whole
+            library, and the gift-code link went with the subscription it unlocked. */}
         <p className="mt-4 text-sm text-amber-600">
-          {free.toLocaleString()} books free, no card needed.
-        </p>
-
-        {/* Gift codes were only reachable at /subscribe, which nothing on this page linked to,
-            so anyone handed a code had nowhere to put it. */}
-        <p className="mt-2 text-sm">
-          <Link
-            href="/subscribe"
-            className="text-amber-700 underline decoration-amber-300 underline-offset-4 hover:decoration-amber-600"
-          >
-            Have a gift code? Redeem it →
-          </Link>
+          Every book free, no card needed.
         </p>
       </div>
 
