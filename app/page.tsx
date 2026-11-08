@@ -73,16 +73,10 @@ export default async function Home() {
 
         <div className="mt-9 flex flex-col sm:flex-row gap-3 justify-center">
           <Link
-            href="/signup"
+            href="/library"
             className="bg-amber-500 hover:bg-amber-600 text-white font-semibold px-8 py-4 rounded-2xl text-lg transition-colors shadow-sm"
           >
             Start Reading Free
-          </Link>
-          <Link
-            href="/login"
-            className="border-2 border-amber-400 text-amber-700 hover:bg-amber-100 font-semibold px-8 py-4 rounded-2xl text-lg transition-colors"
-          >
-            Log In
           </Link>
         </div>
         {/* Every book is free now (paywall removed 2026-10-25), so the offer is the whole
@@ -106,7 +100,7 @@ export default async function Home() {
               return (
                 <Link
                   key={b.id}
-                  href="/signup"
+                  href={`/book/${b.id}`}
                   title={b.title}
                   className="group shrink-0 transition-transform duration-200 hover:-translate-y-2 hover:rotate-0"
                   style={{

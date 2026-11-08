@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 
@@ -22,8 +21,6 @@ export default async function LibraryPage({
   searchParams: Promise<{ series?: string; search?: string; page?: string; platform?: string }>
 }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
 
   const params = await searchParams
   const { series: seriesFilter, search } = params
@@ -160,9 +157,6 @@ export default async function LibraryPage({
     <main className="min-h-screen px-4 py-8 max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-bold text-amber-900">Library</h1>
-        <form action="/api/auth/signout" method="post">
-          <button className="text-amber-600 hover:text-amber-800 text-sm">Sign out</button>
-        </form>
       </div>
 
       {/* Filters.

@@ -1,12 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
-import { redirect, notFound } from 'next/navigation'
+import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
 
 export default async function BookPage({ params }: { params: Promise<{ id: string }> }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
 
   const { id } = await params
   const { data: book } = await supabase
@@ -17,18 +15,9 @@ export default async function BookPage({ params }: { params: Promise<{ id: strin
 
   if (!book) notFound()
 
-  // No paywall (Ryan, 2026-10-25): every book is free to anyone signed in. The subscription
-  // check that gated non-free series is gone; lib/subscription.ts is left for the gift codes.
+  // No sign-in and no paywall: every book is open to anyone. Reading progress was tied to
+  // a user account, so it is no longer recorded.
   const series = book.series as any
-
-  // Mark as read
-  await supabase.from('reading_progress').upsert({
-    user_id: user.id,
-    book_id: book.id,
-    child_profile_id: null,
-    completed: true,
-    last_read_at: new Date().toISOString(),
-  }, { onConflict: 'user_id,book_id,child_profile_id' })
 
   return (
     <main className="min-h-screen bg-amber-50">
