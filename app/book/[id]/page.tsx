@@ -3,6 +3,23 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
 
+// Interior pictures live in the public storage bucket "interior-art" at <book id>/,
+// with a manifest.json listing which paragraph each picture goes after.
+// Paragraphs are counted the same way the picture generator counted them: non-empty lines, from 0.
+type Picture = { after: number; src: string; alt: string }
+
+async function getPictures(bookId: string): Promise<Picture[]> {
+  const base = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/interior-art/${bookId}`
+  try {
+    const res = await fetch(`${base}/manifest.json`, { next: { revalidate: 3600 } })
+    if (!res.ok) return []
+    const items = (await res.json()) as Picture[]
+    return items.map(p => ({ ...p, src: `${base}/${p.src}` }))
+  } catch {
+    return []
+  }
+}
+
 export default async function BookPage({ params }: { params: Promise<{ id: string }> }) {
   const supabase = await createClient()
 
@@ -18,6 +35,8 @@ export default async function BookPage({ params }: { params: Promise<{ id: strin
   // No sign-in and no paywall: every book is open to anyone. Reading progress was tied to
   // a user account, so it is no longer recorded.
   const series = book.series as any
+  const pictures = book.content ? await getPictures(book.id) : []
+  const paragraphs: string[] = String(book.content ?? '').split('\n').filter((p: string) => p.trim())
 
   return (
     <main className="min-h-screen bg-amber-50">
@@ -37,9 +56,19 @@ export default async function BookPage({ params }: { params: Promise<{ id: strin
             className="w-40 mx-auto rounded-2xl shadow-md mb-8" />
         )}
         <div className="book-content bg-white rounded-3xl shadow-sm p-8 sm:p-12">
-          {book.content
-            ? <ReactMarkdown>{book.content}</ReactMarkdown>
-            : <p className="text-amber-400 italic">Story content coming soon.</p>
+          {!book.content
+            ? <p className="text-amber-400 italic">Story content coming soon.</p>
+            : pictures.length === 0
+              ? <ReactMarkdown>{book.content}</ReactMarkdown>
+              : paragraphs.map((para, i) => (
+                  <div key={i}>
+                    <ReactMarkdown>{para}</ReactMarkdown>
+                    {pictures.filter(p => p.after === i).map(p => (
+                      <img key={p.src} src={p.src} alt={p.alt} loading="lazy"
+                        className="w-full rounded-2xl shadow-sm my-6" />
+                    ))}
+                  </div>
+                ))
           }
         </div>
         <div className="mt-8 text-center">
